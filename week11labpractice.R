@@ -9,6 +9,7 @@
 #Problem 5, Function 1
 
 # Solution (for tests):
+df <- read.csv("~/Desktop/STAT 1560/Data/sample_bike.csv")
 
 #' Estimate hourly bike-trip rates
 #' 
