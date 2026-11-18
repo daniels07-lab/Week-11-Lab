@@ -6,7 +6,8 @@
 
 #hello this is daniel
 
-{r}
+#Problem 5, Function 1
+
 # Solution (for tests):
 
 #' Estimate hourly bike-trip rates
