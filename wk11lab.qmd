@@ -1,0 +1,81 @@
+## Part 2: Estimate and Simulate Bike-share Arrivals
+
+Our goal in this next part is to model when users arrive at bike-share stations to request trips, then simulate those requests. Demand may be higher during commuting hours than overnight, so we need a model whose arrival rate can change with time.
+
+A **non-homogeneous Poisson process (NHPP)** is a counting process with a time-varying arrival rate $\lambda(u)$. Counts in disjoint time intervals are independent, and the number of arrivals in an interval $[a,b)$ has a Poisson distribution with mean $\int_a^b \lambda(u)\,du$. Thus, the expected number of arrivals depends on the rate throughout the interval. A homogeneous Poisson process is the special case with a constant rate.
+
+We will model requests for each origin--destination pair with an independent NHPP. Assume its rate is constant within each hour of the day and that this hourly pattern repeats each day. First, we will estimate those hourly rates from observed trips and bike availability; then we will use the estimated rates to simulate user arrivals.
+
+### Problem 4: Set up your repository and R script
+
+Create a local Git repository for this part. In that repository, create an R script named `bike_functions.R`. You will write **two functions** in this script: one to estimate arrival rates from bike-share data and one to simulate arrivals using those rates.
+
+- Add a short README explaining the two functions and how to run an example.
+- Make an initial commit with the README and script, then commit your completed functions and checks.
+- Explain the difference between saving a file and committing a version. We will connect the repository to GitHub in Week 13.
+
+**Solution:**
+
+### Problem 5: Function 1 --- Estimate NHPP arrival rates
+
+We want to estimate $\mu_{s,t,h}$, the rate of user requests to travel from origin station $s$ to destination station $t$ during hour $h$, in requests per hour. Observed trips alone may understate demand because a user cannot take a bike when the origin station is empty. Instead, we estimate the request rate by adjusting observed departures for the time bikes were available:
+
+$$\widehat{\mu}_{s,t,h} = \frac{\widehat{x}_{s,t,h}}{\widehat{\alpha}_{s,h}},$$
+
+where $\widehat{x}_{s,t,h}$ is the number of observed customer departures from $s$ to $t$ during hour $h$, divided by the number of complete observation days, and $\widehat{\alpha}_{s,h}$ is the fraction of that hour's total observation time with at least one bike at station $s$. This adjustment assumes the request rate is the same during available and unavailable periods within each station-pair/hour group.
+
+Use your code from Week 10 to reconstruct station inventories and measure bike availability. Generalize that code into a function such as `estimate_arrival_rates(data, window_start, window_end)` that takes trip data and an observation window and returns the estimated hourly rates.
+
+Use `../Data/sample_bike.csv` and February 16--21, 2022 as six complete observation days: the window starts at midnight on February 16 and ends at midnight on February 22, with the endpoint excluded.
+
+Your function should return a table with columns `origin`, `destination`, `hour` (0--23), `observed_rate`, `availability`, and `rate`. Calculate `rate` using the formula above. When availability is zero, return `NA` for `rate`: demand cannot be estimated from that group, even if its observed count is zero. Document arguments and return values with roxygen-style comments. State how you handle any input data checks.
+
+Check the function on a few tiny dataset you can calculate by hand. For example, one departure during a two-day window gives an observed rate of 0.5 for that station-pair/hour. If the origin was available for half of that hour's total observation time, the adjusted rate is 1 request per hour.
+
+```{r}
+# Solution (for tests):
+
+
+Hello
+```
+
+### Problem 6: Function 2 --- Simulate NHPP arrivals
+
+Write a function such as `simulate_arrivals(rates, start_time, end_time)` that uses the first function's rate table to simulate customer requests during the half-open interval `[start_time, end_time)`. Simulate each origin--destination pair independently using **thinning**.
+
+For each station pair $(s,t)$, find its maximum hourly rate $M_{s,t}=\max_h\widehat{\mu}_{s,t,h}$. First generate all candidate arrivals over the entire simulation window from a homogeneous Poisson process with this constant rate. Its successive waiting times are independent exponential random variables with rate $M_{s,t}$ (mean $1/M_{s,t}$ hours). Then, for each candidate time $u$, look up its hour $h(u)$ and accept the candidate independently with probability
+
+$$p_{s,t}(u)=\frac{\widehat{\mu}_{s,t,h(u)}}{M_{s,t}}.$$
+
+For example, if the maximum rate is 8 requests per hour and a candidate falls in an hour with rate 2, accept that candidate with probability $2/8=0.25$. Keep only accepted candidates. This process is summarized below.
+
+``` text
+Create an empty arrival table.
+For each origin-destination pair:
+    Set M to the maximum of its 24 hourly rates.
+    If M is zero, skip this pair (it has no arrivals).
+    Create an empty list of candidate times.
+    Set candidate_time to start_time.
+    Repeat:
+        Draw a waiting time from an exponential distribution with rate M.
+        Advance candidate_time by this waiting time, converted to seconds.
+        If candidate_time is at or after end_time, stop this loop.
+        Store candidate_time in the candidate list.
+    For each stored candidate time u:
+        Find its hour of the day and look up this pair's hourly rate.
+        Set acceptance_probability to hourly_rate / M.
+        Draw U independently from Uniform(0, 1).
+        If U < acceptance_probability:
+            Append origin, destination, and u to the arrival table.
+Sort the arrival table by arrival_time and return it.
+```
+
+Your function should return columns `origin`, `destination`, and `arrival_time`, including a correctly structured empty table if no arrivals occur. Document the function and test a few boundary cases.
+
+```{r}
+# Solution (for tests):
+```
+
+## Submission
+
+Submit your completed rendered PDF and a link to your github repository for part 2. You and your partner will have the same github repository but will submit separate quarto pdfs.
