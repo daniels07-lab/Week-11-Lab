@@ -261,3 +261,117 @@ stopifnot(
   test_zero$availability == 0,
   is.na(test_zero$rate)
 )
+
+sharon solution for problem 6
+# Solution (for tests):
+#' simulating customer bike requests
+#'
+#' @description simulating arrivals using thinning for each station pair
+#' @param rates is a data frame of hourly rates stored from problem 5
+#' @param start_time represents the beginning of simulation window
+#' @param end_time represents the end of simulation window
+#' @return returns a data frame with origin, destination, and arrival_time
+#' @example
+#' simulate_arrivals(rates, "2022-02-22", "2022-02-23")
+
+simulate_arrivals <- function(rates, start_time, end_time) {
+  input <- c("origin", "destination", "hour", "rate")
+  if (!all(input %in% names(rates))) {
+    stop("missing columns")
+  }
+  
+  start_time <- as.POSIXct(start_time)
+  end_time <- as.POSIXct(end_time)
+  
+  if (length(start_time) != 1 || length(end_time) != 1 ||
+      is.na(start_time) || is.na(end_time) ||
+      end_time <= start_time) {
+    stop("invalid simulation window")
+  }
+  
+  if (anyNA(rates$rate) || any(rates$rate < 0) ||
+      any(!is.finite(rates$rate)) ||
+      anyNA(rates$hour) ||
+      any(rates$hour < 0 | rates$hour > 23 |
+          rates$hour %% 1 != 0)) {
+    stop("invalid hourly rates")
+  }
+  
+  #this table will store simulated arrivals
+  arrivals <- data.frame(
+    origin = character(),
+    destination = character(),
+    arrival_time = as.POSIXct(character())
+  )
+  
+  #each combination of station pairs
+  pairs <- rates %>%
+    select(origin, destination) %>%
+    distinct()
+  
+  #loop for each station pair
+  for (i in 1:nrow(pairs)) {
+    s <- pairs$origin[i]
+    t <- pairs$destination[i]
+    pair_rates <- rates %>%
+      filter(origin == s, destination == t)
+    
+    #M stores the max hour rate
+    M <- max(pair_rates$rate)
+    if (M == 0) {
+      next
+    }
+    
+    #this stores the candidate arrival times
+    candidate_time <- start_time
+    candidates <- as.POSIXct(character())
+    
+    while (candidate_time < end_time) {
+      
+      #wait time converted to seconds
+      wait <- rexp(1, rate = M) * 3600
+      candidate_time <- candidate_time + wait
+      
+      if (candidate_time >= end_time) {
+        break
+      }
+      candidates <- c(candidates, candidate_time)
+    }
+    
+    #for loop that determines whether or not to accept candidates
+    for (u in candidates) {
+      hour <- as.integer(format(u, "%H"))
+      hourly_rate <- pair_rates$rate[pair_rates$hour == hour]
+      acceptance_probability <- hourly_rate / M
+      
+      if (runif(1) < acceptance_probability) {
+        arrivals <- rbind(
+          arrivals,
+          data.frame(
+            origin = s,
+            destination = t,
+            arrival_time = as.POSIXct(u, origin = "1970-01-01")
+          )
+        )
+      }
+    }
+  }
+  
+  #sorting arrivals in chronological order
+  arrivals <- arrivals %>%
+    arrange(arrival_time)
+  
+  return(arrivals)
+}
+
+#running the function
+set.seed(3)
+
+#this keeps resulting in an error but i am confused why..
+simulated <- simulate_arrivals(
+  rates,
+  "2022-02-22 00:00:00",
+  "2022-02-23 00:00:00"
+)
+
+head(simulated)
